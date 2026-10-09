@@ -2,4 +2,4 @@
 __pycache__/
 .pytest_cache/
 *.pyc
-sessions.json
+agent.db

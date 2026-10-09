@@ -1,35 +1,213 @@
 <!DOCTYPE html>
-<html>
+<html lang="zh">
 <head>
-    <meta charset="utf-8">
-    <title>我的 Agent</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>我的 Agent</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "Segoe UI", "Microsoft YaHei", sans-serif;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    background: #f5f6f8;
+  }
+  header {
+    padding: 14px 20px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,.1);
+  }
+  header h1 { font-size: 18px; font-weight: 600; }
+  header .dot { width: 9px; height: 9px; background: #4ade80; border-radius: 50%; }
+  header .sub { font-size: 12px; opacity: .85; }
+  #chat {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .bubble {
+    max-width: 72%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    line-height: 1.6;
+    white-space: pre-wrap;   /* 保留换行，工具返回的多行结果才不会挤成一团 */
+    word-break: break-word;
+    animation: pop .18s ease;
+  }
+  .bubble.user {
+    align-self: flex-end;
+    background: #4f46e5;
+    color: #fff;
+    border-bottom-right-radius: 4px;
+  }
+  .bubble.assistant {
+    align-self: flex-start;
+    background: #fff;
+    color: #1f2937;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 4px;
+  }
+  .bubble.error { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
+  .bubble.loading { color: #9ca3af; font-style: italic; }
+  @keyframes pop {
+    from { transform: translateY(4px); opacity: 0; }
+    to   { transform: translateY(0); opacity: 1; }
+  }
+  .hint { font-size: 12px; color: #9ca3af; text-align: center; padding: 6px; }
+  #composer {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px;
+    background: #fff;
+    border-top: 1px solid #e5e7eb;
+    align-items: flex-end;
+  }
+  #session {
+    width: 130px;
+    padding: 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 14px;
+  }
+  #msg {
+    flex: 1;
+    padding: 10px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 14px;
+    font-family: inherit;
+    resize: none;
+    height: 42px;
+    max-height: 120px;
+    line-height: 1.4;
+  }
+  #send {
+    padding: 10px 20px;
+    background: #4f46e5;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  #send:hover { background: #4338ca; }
+  #send:disabled { background: #c7d2fe; cursor: not-allowed; }
+</style>
 </head>
-
 <body>
-    <h1>你好，我是你的 Agent</h1>
-    <input id="msg" placeholder="输入你想说的话">
-    <button id="send">发送</button>
-    <div id="answer"></div>
-    <script>
-    // 点「发送」按钮时，执行这个函数
-    document.getElementById("send").addEventListener("click", async function () {
-    // 1. 拿输入框里用户打的字
-        const text = document.getElementById("msg").value;
+<header>
+  <span class="dot"></span>
+  <h1>我的 Agent</h1>
+  <span class="sub">计算 · 搜索 GitHub · 天气 · 待办</span>
+</header>
 
-    // 2. 发 POST 请求到后端的 /chat
-        const resp = await fetch("/chat", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: text, session_id: "w1" }),
-        });
+<div id="chat">
+  <div class="bubble assistant">你好！我是你的 Agent，可以帮你计算、搜索 GitHub 项目、查天气、记待办。直接说吧～</div>
+</div>
 
-    // 3. 把返回的 JSON 转成对象，取出 answer 字段
-        const data = await resp.json();
+<div class="hint">Enter 发送 · Shift+Enter 换行 · 左边可切换会话 ID（不同 ID = 不同记忆）</div>
 
-    // 4. 把回复显示到盒子（div）里
-        document.getElementById("answer").innerText = data.answer;
+<div id="composer">
+  <input id="session" value="w1" placeholder="会话 ID">
+  <textarea id="msg" placeholder="输入你想说的话…"></textarea>
+  <button id="send">发送</button>
+</div>
+
+<script>
+const chat = document.getElementById("chat");
+const sessionInput = document.getElementById("session");
+const msgInput = document.getElementById("msg");
+const sendBtn = document.getElementById("send");
+
+// 往聊天区加一条气泡，并自动滚到底部
+function addBubble(text, who) {
+  const div = document.createElement("div");
+  div.className = "bubble " + who;
+  div.textContent = text;              // textContent 只写纯文本，防注入
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;  // 自动滚到底部
+  return div;
+}
+
+async function send() {
+  const text = msgInput.value.trim();
+  if (!text) return;
+  const session_id = sessionInput.value.trim() || "w1";
+
+  addBubble(text, "user");             // 1. 立刻显示用户的话
+  msgInput.value = "";                 // 2. 清空输入框
+  msgInput.style.height = "42px";
+
+  const bubble = addBubble("思考中…", "assistant loading");  // 3. 空气泡，等会流式填字
+  sendBtn.disabled = true;             // 4. 请求期间禁用按钮，防连点
+  let started = false;                 // 第一个 token 到来前先显示"思考中"
+
+  try {
+    const resp = await fetch("/chat/stream", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, session_id }),
     });
-</script>
 
+    const reader = resp.body.getReader();   // 读响应体流
+    const decoder = new TextDecoder();
+    let buf = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
+
+      const parts = buf.split("\n\n");   // SSE 事件之间用空行分隔
+      buf = parts.pop();                 // 最后一段可能不完整，留到下次拼
+
+      for (const part of parts) {
+        for (const line of part.split("\n")) {
+          if (!line.startsWith("data: ")) continue;
+          const payload = line.slice(6).trim();
+          if (payload === "[DONE]") continue;
+          const { token } = JSON.parse(payload);
+
+          if (!started) {                // 第一个字到了，撤掉"思考中"
+            bubble.textContent = "";
+            bubble.className = "bubble assistant";
+            started = true;
+          }
+          bubble.textContent += token;   // 逐片追加
+          chat.scrollTop = chat.scrollHeight;
+        }
+      }
+    }
+  } catch (e) {
+    bubble.className = "bubble assistant error";
+    bubble.textContent = "请求出错：" + e;
+  } finally {
+    sendBtn.disabled = false;
+    msgInput.focus();
+  }
+}
+
+sendBtn.addEventListener("click", send);
+
+// 输入框自动长高（随内容），并监听回车发送
+msgInput.addEventListener("input", () => {
+  msgInput.style.height = "auto";
+  msgInput.style.height = Math.min(msgInput.scrollHeight, 120) + "px";
+});
+msgInput.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();   // 回车默认是换行，这里改成发送
+    send();
+  }
+});
+</script>
 </body>
 </html>

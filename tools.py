@@ -1,5 +1,6 @@
 import requests
 from simpleeval import simple_eval
+import db
 
 def calculator(expression:str)->str:
     """计算一个数学表达式，返回结果"""
@@ -41,19 +42,17 @@ def weather(city: str) -> str:
     except Exception as e:
         return f"查询天气失败: {e}"
 
-TODOS = {}   # session_id -> [todo1, todo2, ...]，每个 session 独立一份待办列表
-CURRENT_SESSION = None 
+CURRENT_SESSION = None   # agent 执行工具前设置，标记"当前是哪个会话"
 
 
 def todo(action: str, item: str = "") -> str:
-    """管理待办事项。action 是 add / list / remove"""
-    todos = TODOS.setdefault(CURRENT_SESSION, [])   # 当前 session 的待办列表
-
+    """管理待办事项。action 是 add / list / remove（存 SQLite，重启不丢）"""
     if action == "add":
-        todos.append(item)
+        db.add_todo(CURRENT_SESSION, item)
         return f"已添加待办: {item}"
 
     elif action == "list":
+        todos = db.list_todos(CURRENT_SESSION)
         if not todos:
             return "暂无待办"
         result = "待办列表:"
@@ -62,8 +61,8 @@ def todo(action: str, item: str = "") -> str:
         return result
 
     elif action == "remove":
-        if item in todos:
-            todos.remove(item)
+        if item in db.list_todos(CURRENT_SESSION):
+            db.remove_todo(CURRENT_SESSION, item)
             return f"已删除待办: {item}"
         return f"待办 {item} 不存在"
 
