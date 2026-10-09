@@ -174,41 +174,6 @@ python -m pytest -v
 
 ---
 
-## 我踩过的坑（学习记录）
-
-> 每个坑都是真实报错、真实排查。记下来比看十篇教程都有用。
-
-1. **改完代码忘了保存就运行** —— 终端跑的是硬盘上的旧版本，输出跟预期不符。教训：**改完先 Ctrl+S 再运行**。
-
-2. **环境变量名写错** —— 写了 `os.getenv("OPENAI_API_KEY")`，但 `.env` 里存的是 `DEEPSEEK_API_KEY`，拿到 `None`，报 `OpenAIError: The api_key client option must be set`。教训：`os.getenv()` 里的名字必须跟 `.env` 里 `=` 左边**一字不差**。
-
-3. **用了危险的 `eval`** —— 计算器最初用 `eval()` 执行表达式，有任意代码执行风险，换成 `simpleeval` 的 `simple_eval`。教训：**别用 `eval` 处理不可信输入**。
-
-4. **import 了却没调用** —— 写了 `from simpleeval import simple_eval`，但函数里还在调 `eval()`。教训：import 只是「把东西搬进来」，还得真正去调用它。
-
-5. **字符串漏引号** —— JSON Schema 里写 `"type":object`（漏了引号），`object` 变成了 Python 内置类。当时能跑，发给 LLM 序列化时才炸。教训：JSON 里 `"type"` 的值必须是字符串 `"object"`，要加引号。
-
-6. **拼写错 + 只改一半** —— `parameters` 写成了 `paraters`，三处只改了两处，剩下一处字典键名没改，后面 `t["parameters"]` 就 KeyError。教训：**一个名字多处使用，改名必须全部改**。
-
-7. **`dict + list` 类型错误** —— `trim_messages` 里写了 `messages[0] + messages[-19:]`（字典 + 列表），正确写法是 `[messages[0]] + messages[-19:]`。这个 bug 手动测从没暴露（对话都太短，没触发压缩分支），是 **pytest 用 30 条消息把它逼出来的**。教训：**测试能覆盖手动测不到的边界分支**。
-
-8. **换数据结构只改了一半** —— 要用 `dict.setdefault`，但 `TODOS` 还声明成 `[]`（list），报 `AttributeError: 'list' object has no attribute 'setdefault'`。教训：换类型时，声明处也要一起改。
-
-9. **类名对不上** —— 定义了 `class AskRequest`，接口里却写 `data:ChatIn`，报 `NameError: name 'ChatIn' is not defined`。教训：改类名要两处一起改。
-
-10. **模型名凭旧印象** —— 一开始以为只有 `deepseek-chat`、`deepseek-flash` 不存在，后来看官方文档发现 `deepseek-flash` 是有效的推理模型。教训：**以官方文档为准，别凭旧印象**。
-
-11. **进程生命周期误解** —— 困惑「为什么历史条数一直是 5」：每次 `python -c` 都是**新进程**，内存里的 `SESSIONS`/`TODOS` 进程一退出就清空。教训：**内存状态的生命周期 = 进程生命周期**；要跨请求保留状态，需要常驻服务（FastAPI）或持久化存储（SQLite）。
-
-12. **`<script>` 放在了元素出生前** —— 脚本放在 `<head>` 里，`getElementById` 找不到还没被浏览器读到的按钮，返回 `null`，点按钮没反应。教训：浏览器「边读边执行」，脚本要操作的元素必须写在脚本**上面**（或放到 `</body>` 前）。
-
-13. **拼写错藏在错误路径里** —— `save` 拼成 `sava`，正常路径不经过它、测试也发现不了；一旦真出错走进 `except` 分支才爆 `NameError`，还盖住真正的错误信息。教训：**except 里的代码最该多看一眼**，因为平时跑不到。
-
-14. **写了函数却没调用 / 没接线** —— `msg_to_dict` 写对了但两处 `append(msg)` 没换成它；`save_sessions`/`load_sessions` 写对了但一个都没接线。教训：**函数要被人调用才生效**，写好函数 ≠ 用上函数。
-
-15. **`git add` 的 LF/CRLF warning** —— Windows 换行符（CRLF）和 Git 默认（LF）不一致的提示，**无害，不用管**。真正要管的是把 `agent.db`、`sessions.json` 这类运行时数据加进 `.gitignore`，别提交进仓库。
-
----
 
 ## 技术栈
 
