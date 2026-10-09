@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>我的 Agent</title>
+</head>
+
+<body>
+    <h1>你好，我是你的 Agent</h1>
+    <input id="msg" placeholder="输入你想说的话">
+    <button id="send">发送</button>
+    <div id="answer"></div>
+    <script>
+    // 点「发送」按钮时，执行这个函数
+    document.getElementById("send").addEventListener("click", async function () {
+    // 1. 拿输入框里用户打的字
+        const text = document.getElementById("msg").value;
+
+    // 2. 发 POST 请求到后端的 /chat
+        const resp = await fetch("/chat", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ message: text, session_id: "w1" }),
+        });
+
+    // 3. 把返回的 JSON 转成对象，取出 answer 字段
+        const data = await resp.json();
+
+    // 4. 把回复显示到盒子（div）里
+        document.getElementById("answer").innerText = data.answer;
+    });
+</script>
+
+</body>
+</html>
