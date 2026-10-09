@@ -1,3 +1,4 @@
+import requests
 from simpleeval import simple_eval
 
 def calculator(expression:str)->str:
@@ -9,12 +10,36 @@ def calculator(expression:str)->str:
         return f"计算错误: {e}"
 
 def search(query: str) -> str:
-    """搜索网络，返回结果（模拟）"""
-    return f"（模拟搜索结果）关于「{query}」：这是假数据，真实的搜索以后接搜索引擎 API。"
+    """搜索Github项目,返回相关项目"""
+    try:
+        r=requests.get(
+            "https://api.github.com/search/repositories",
+            params={"q":query,"per_page":3},
+            headers={"User-Agent":"agent-demo"},
+            timeout=5,
+        )
+        r.raise_for_status()
+        data=r.json()
+        items=data["items"]
+        if not items:
+            return f"未找到{query}相关的项目"
+        result="搜索结果:\n"
+        for item in items:
+            result += f"{item['full_name']},{item['html_url']},{item['description']or'(无简介)'},{item['stargazers_count']}\n"
+        return result
+    except Exception as e:
+        return f"搜索失败: {e}"
+    
 
 def weather(city: str) -> str:
-    """查询某城市天气（模拟）"""
-    return f"（模拟天气）{city} 今天晴，25°C，微风。"
+    """查询某城市天气（真实 API：wttr.in）"""
+    try:
+        url = f"https://wttr.in/{city}?format=3&lang=zh"
+        r = requests.get(url, timeout=5)
+        r.raise_for_status()       # 状态码不是 200 就抛异常
+        return r.text.strip()      # 去掉首尾的换行/空格
+    except Exception as e:
+        return f"查询天气失败: {e}"
 
 TODOS = {}   # session_id -> [todo1, todo2, ...]，每个 session 独立一份待办列表
 CURRENT_SESSION = None 
@@ -90,7 +115,7 @@ register_tool(
 
 register_tool(
     name="search",
-    description="搜索网络，返回与 query 相关的结果。",
+    description="搜索 GitHub 上的项目，返回与 query 相关的结果。",
     parameters={
         "type": "object",
         "properties": {

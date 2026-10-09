@@ -2,7 +2,6 @@
 import tools
 import agent
 
-
 def test_calculator():
     assert tools.calculator("1+2*3") == "1+2*3=7"
 
@@ -11,10 +10,25 @@ def test_calculator_no_crash():
     result = tools.calculator("1/0")
     assert "错误" in result
 
-def test_search():
+def test_search(monkeypatch):
+    class Faker:
+        def raise_for_status(self):pass
+        def json(self):
+            return {
+                "items":[
+                    {"full_name":"AI","html_url":"https://github.com/AI","description":"AI","stargazers_count":100},
+                ]
+            }
+
+    monkeypatch.setattr(tools.requests,"get",lambda *a,**k:Faker())
     assert "AI" in tools.search("AI")
 
-def test_weather():
+def test_weather(monkeypatch):
+    class Faker:
+        def raise_for_status(self):pass
+        text = "北京： +20C"
+
+    monkeypatch.setattr(tools.requests,"get",lambda *a,**k:Faker())
     assert "北京" in tools.weather("北京")
 
 def test_four_tools_registered():
